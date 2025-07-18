@@ -206,8 +206,8 @@ def export_orders_logs_to_excel(job):
             LEFT JOIN current_stocks cs ON cs.id = ol.curr_stk_id
             LEFT JOIN stocks s ON s.id = cs.stock_id
             LEFT JOIN boxes b ON b.id = cs.box_id
-            LEFT JOIN locations l ON l.id = b.location_id
-            LEFT JOIN warehouses w ON w.id = l.warehouse_id
+            LEFT JOIN locations l ON b.location_id = l.id
+            LEFT JOIN warehouses w ON l.warehouse_id = w.id
             LEFT JOIN customers c ON c.id = ol.customer_id
             LEFT JOIN users u ON u.id = ol.created_by
             WHERE ol.created_at BETWEEN %s AND %s
