@@ -206,8 +206,8 @@ def export_orders_logs_to_excel(job):
             LEFT JOIN current_stocks cs ON cs.id = ol.curr_stk_id
             LEFT JOIN stocks s ON s.id = cs.stock_id
             LEFT JOIN boxes b ON b.id = cs.box_id
-            LEFT JOIN locations l ON b.location_id = l.id
-            LEFT JOIN warehouses w ON l.warehouse_id = w.id
+            LEFT JOIN locations l ON l.id = b.location_id
+            LEFT JOIN warehouses w ON w.id = l.warehouse_id
             LEFT JOIN customers c ON c.id = ol.customer_id
             LEFT JOIN users u ON u.id = ol.created_by
             WHERE ol.created_at BETWEEN %s AND %s
@@ -221,16 +221,30 @@ def export_orders_logs_to_excel(job):
         rows = cursor.fetchall()
         df = pd.DataFrame(rows)
 
-        # created_at datetime ve süre hesaplama
-        df['created_at'] = pd.to_datetime(df['created_at'])
-        df['ElapsedSeconds'] = df['created_at'].diff().dt.total_seconds().fillna(0).astype(int)
+        # ElapsedSeconds hesaplama sadece 'created_at' varsa yapılmalı
+        if 'created_at' in df.columns:
+            try:
+                # created_at datetime formatına çevrilir
+                df['created_at'] = pd.to_datetime(df['created_at'])
 
-        # ElapsedSeconds kolonu, created_at'tan sonra gelsin
-        cols = df.columns.tolist()
-        if 'created_at' in cols and 'Created_by' in cols:
-            created_at_index = cols.index('created_at')
-            cols.insert(created_at_index + 1, cols.pop(cols.index('ElapsedSeconds')))
-            df = df[cols]
+                # created_at farkları hesaplanır
+                df['ElapsedSeconds'] = df['created_at'].diff().dt.total_seconds().fillna(0).astype(int)
+
+                # ElapsedSeconds kolonu, created_at'tan hemen sonra gelsin
+                cols = df.columns.tolist()
+                if 'ElapsedSeconds' in cols:
+                    created_at_index = cols.index('created_at')
+                    # Önce ElapsedSeconds'ı çıkar
+                    cols.pop(cols.index('ElapsedSeconds'))
+                    # created_at'tan hemen sonra tekrar ekle
+                    cols.insert(created_at_index + 1, 'ElapsedSeconds')
+                    df = df[cols]
+            except Exception as e:
+                print(f"[!] ElapsedSeconds hesaplama hatası: {e}")
+                df['ElapsedSeconds'] = 0
+        else:
+            print("[!] 'created_at' sütunu bulunamadı, ElapsedSeconds hesaplanamadı.")
+            df['ElapsedSeconds'] = 0
 
         # Geçici dosyaya yaz
         df.to_excel(temp_path, index=False)
