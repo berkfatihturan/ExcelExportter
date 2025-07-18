@@ -194,23 +194,40 @@ def export_orders_logs_to_excel(job):
         # SQL sorgusu (action varsa filtreli)
         sql = f"""
             SELECT 
-                ol.id, ol.order_id, ol.order_item_id, ol.order_sort_num,
-                s.code AS ItemCode, s.name AS ItemName, s.feature AS ItemDescription,
-                s.production_date AS ItemProductionDate, s.weight AS ItemWeight, s.volume AS ItemVolume,
-                ol.used_barcode_num AS Barcode, ol.orderQty, ol.pickingQty,
-                w.name AS PickPlace_W, l.name AS PickPlace_L, b.name AS PickPlace_B,
-                ol.putawayQty, ol.putaway_pin, ol.shipping_number,
-                c.id AS CurrCustomerId, c.name AS CurrCustomerName, c.post_code, c.phone, c.email,
-                ol.action, ol.created_at, u.name AS Created_by
-            FROM orders_logs ol
-            LEFT JOIN current_stocks cs ON cs.id = ol.curr_stk_id
+                o.id AS OrderItemId,
+                o.order_id AS OrderId,
+                o.order_sort_num AS OrderItemOrderNumber,
+                s.code AS ItemCode,
+                s.name AS ItemName,
+                s.feature AS ItemDescription,
+                s.production_date AS ItemProductionDate,
+                s.weight AS ItemWeight,
+                s.volume AS ItemVolume,
+                GROUP_CONCAT(b.barcode) AS Barcode,
+                o.orderQty AS OrderQty,
+                o.pickingQty AS PickingQty,
+                w.name AS PickPlace_W,
+                l.name AS PickPlace_L,
+                b2.name AS PickPlace_B,
+                o.putawayQty AS PutawayQty,
+                o.putaway_pin AS PutawayLocId,
+                o.shipping_number AS ShippingNumber,
+                c.id AS CurrCustomerId,
+                c.name AS CurrCustomerName,
+                c.post_code AS CurrCustomerPostCode,
+                c.phone AS CurrCustomerPhone,
+                c.email AS CurrCustomerEmail,
+                o.created_at AS created_at
+            FROM order_items o
+            LEFT JOIN current_stocks cs ON cs.id = o.curr_stk_id
             LEFT JOIN stocks s ON s.id = cs.stock_id
-            LEFT JOIN boxes b ON b.id = cs.box_id
-            LEFT JOIN locations l ON l.id = b.location_id
+            LEFT JOIN barcodes b ON b.curr_stk_id = cs.id
+            LEFT JOIN boxes b2 ON b2.id = cs.box_id
+            LEFT JOIN locations l ON l.id = b2.location_id
             LEFT JOIN warehouses w ON w.id = l.warehouse_id
-            LEFT JOIN customers c ON c.id = ol.customer_id
-            LEFT JOIN users u ON u.id = ol.created_by
-            WHERE ol.created_at BETWEEN %s AND %s
+            LEFT JOIN customers c ON c.id = o.customer_id
+            WHERE o.order_id = %s
+            GROUP BY o.id
         """
         params = [min_dt.strftime("%Y-%m-%d %H:%M:%S"), max_dt.strftime("%Y-%m-%d %H:%M:%S")]
         if action:
