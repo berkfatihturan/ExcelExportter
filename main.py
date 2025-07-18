@@ -209,8 +209,7 @@ def export_orders_logs_to_excel(job):
         df.to_excel(file_path, index=False)
 
         from openpyxl import load_workbook
-        from openpyxl.styles import PatternFill
-        from openpyxl.styles.borders import Border, Side
+        from openpyxl.styles import PatternFill, Border, Side
 
         wb = load_workbook(file_path)
         ws = wb.active
@@ -239,31 +238,36 @@ def export_orders_logs_to_excel(job):
                 except:
                     continue
 
-        # Ek bilgi (ortalama ve toplam süre)
+        # Hesaplamalar
         created_at_list = df['created_at'].tolist()
         elapsed_seconds_list = df['ElapsedSeconds'].tolist()
 
         start_time = created_at_list[0]
         end_time = created_at_list[-1]
         total_seconds = int((end_time - start_time).total_seconds())
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
-        human_readable = f"{hours} saat {minutes} dakika {seconds} saniye"
+        total_h = total_seconds // 3600
+        total_m = (total_seconds % 3600) // 60
+        total_s = total_seconds % 60
+        human_readable = f"{total_h} saat {total_m} dakika {total_s} saniye"
 
         avg_seconds = sum(elapsed_seconds_list) / len(elapsed_seconds_list)
 
         filtered_seconds = [s for s in elapsed_seconds_list if s < 10]
         filtered_avg_seconds = sum(filtered_seconds) / len(filtered_seconds) if filtered_seconds else 0
+        filtered_total_duration = filtered_avg_seconds * len(filtered_seconds)
+
+        ft_h = int(filtered_total_duration // 3600)
+        ft_m = int((filtered_total_duration % 3600) // 60)
+        ft_s = int(filtered_total_duration % 60)
 
         footer_row = ws.max_row + 2
         ws[f"A{footer_row}"] = "Gercek"
         ws[f"B{footer_row}"] = human_readable
-        ws[f"C{footer_row}"] = round(avg_seconds, 2)
+        ws[f"C{footer_row}"] = round(avg_seconds, 6)
 
         ws[f"A{footer_row + 1}"] = "Filtrelenmiş Ortalama Süre (Kırmızı değerler hariç)"
-        ws[f"B{footer_row + 1}"] = f"{int(filtered_avg_seconds // 3600)} saat {int((filtered_avg_seconds % 3600) // 60)} dakika"
-        ws[f"C{footer_row + 1}"] = round(filtered_avg_seconds, 2)
+        ws[f"B{footer_row + 1}"] = f"{ft_h} saat {ft_m} dakika {ft_s} saniye"
+        ws[f"C{footer_row + 1}"] = round(filtered_avg_seconds, 6)
 
         thin_border = Border(
             left=Side(style='thin'),
