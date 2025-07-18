@@ -1,8 +1,8 @@
 import mysql.connector
 import pandas as pd
-import json
-import ast
+from datetime import datetime
 import os
+import ast
 
 DB_CONFIG = {
     'host': 'localhost',
@@ -14,6 +14,7 @@ DB_CONFIG = {
 
 EXPORT_FOLDER = "/home/smartemk221/Desktop/wms/exports"
 
+# === GET PENDING JOB ===
 def get_pending_order_jobs():
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor(dictionary=True)
@@ -29,6 +30,7 @@ def get_pending_order_jobs():
     return job
 
 
+# === UPDATE JOB STATUS ===
 def update_job_status(job_id, status, percent=0):
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor()
@@ -38,14 +40,15 @@ def update_job_status(job_id, status, percent=0):
     conn.close()
 
 
+# === EXPORT TO EXCEL ===
 def export_order_items_to_excel(job):
     job_id = job["id"]
 
-    # Geçerli Python söz dizimine çevirmek için ast.literal_eval kullan
+    # JSON benzeri search_values stringini Python dict'e çevir
     try:
         search_values = ast.literal_eval(job["search_values"])
     except Exception as e:
-        print(f"search_values hatası: {e}")
+        print(f"[!] search_values ayrıştırma hatası: {e}")
         update_job_status(job_id, 'failed', 0)
         return
 
@@ -55,7 +58,8 @@ def export_order_items_to_excel(job):
         print("order_id bulunamadı.")
         return
 
-    file_name = job["file_name"]
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"orders_{order_id}_{timestamp}"
     file_path = os.path.join(EXPORT_FOLDER, f"{file_name}.xlsx")
 
     try:
@@ -64,7 +68,8 @@ def export_order_items_to_excel(job):
         conn = mysql.connector.connect(**DB_CONFIG)
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(f"""
+        # SQL sorgusu
+        cursor.execute("""
             SELECT 
                 o.id AS OrderItemId,
                 o.order_id AS OrderId,
@@ -107,23 +112,27 @@ def export_order_items_to_excel(job):
         os.makedirs(EXPORT_FOLDER, exist_ok=True)
         df.to_excel(file_path, index=False)
 
-        update_job_status(job_id, 'done', 100)
-
-        cursor.execute("UPDATE export_jobs SET file_path = %s WHERE id = %s", (file_path, job_id))
+        # Güncelleme
+        cursor.execute("""
+            UPDATE export_jobs 
+            SET status=%s, percent=%s, file_name=%s, file_path=%s 
+            WHERE id = %s
+        """, ('done', 100, file_name, file_path, job_id))
         conn.commit()
 
         cursor.close()
         conn.close()
 
-        print(f"[✓] Export completed: {file_path}")
+        print(f"[✓] Export tamamlandı: {file_path}")
     except Exception as e:
         update_job_status(job_id, 'failed', 0)
-        print(f"[!] Export failed: {e}")
+        print(f"[!] Export işlemi başarısız: {e}")
 
 
+# === MAIN ===
 if __name__ == "__main__":
     job = get_pending_order_jobs()
     if job:
         export_order_items_to_excel(job)
     else:
-        print("[✓] No pending export_jobs found.")
+        print("[✓] Bekleyen export_jobs kaydı yok.")
