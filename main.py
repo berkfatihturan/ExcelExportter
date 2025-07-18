@@ -129,10 +129,112 @@ def export_order_items_to_excel(job):
         print(f"[!] Export işlemi başarısız: {e}")
 
 
+def export_orders_logs_to_excel(job):
+    job_id = job["id"]
+
+    try:
+        search_values = ast.literal_eval(job["search_values"])
+    except Exception as e:
+        print(f"[!] search_values ayrıştırma hatası: {e}")
+        update_job_status(job_id, 'failed', 0)
+        return
+
+    min_time = search_values.get("min")
+    max_time = search_values.get("max")
+    action = search_values.get("action")
+
+    if not min_time or not max_time:
+        update_job_status(job_id, 'failed', 0)
+        print("min veya max zamanı eksik.")
+        return
+
+    try:
+        # Laravel'deki gibi saatten 3 saat geri git
+        min_dt = datetime.strptime(min_time, "%Y-%m-%dT%H:%M") - pd.Timedelta(hours=3)
+        max_dt = datetime.strptime(max_time, "%Y-%m-%dT%H:%M") - pd.Timedelta(hours=3)
+    except Exception as e:
+        print(f"[!] Zaman ayrıştırma hatası: {e}")
+        update_job_status(job_id, 'failed', 0)
+        return
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"orders_logs_{timestamp}"
+    file_path = os.path.join(EXPORT_FOLDER, f"{file_name}.xlsx")
+
+    try:
+        update_job_status(job_id, 'processing', 0)
+
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+
+        sql = f"""
+            SELECT 
+                ol.id, ol.order_id, ol.order_item_id, ol.order_sort_num,
+                s.code AS ItemCode, s.name AS ItemName, s.feature AS ItemDescription,
+                s.production_date AS ItemProductionDate, s.weight AS ItemWeight, s.volume AS ItemVolume,
+                ol.used_barcode_num AS Barcode, ol.orderQty, ol.pickingQty,
+                w.name AS PickPlace_W, l.name AS PickPlace_L, b.name AS PickPlace_B,
+                ol.putawayQty, ol.putaway_pin, ol.shipping_number,
+                c.id AS CurrCustomerId, c.name AS CurrCustomerName, c.post_code, c.phone, c.email,
+                ol.action, ol.created_at, u.name AS Created_by
+            FROM orders_logs ol
+            LEFT JOIN current_stocks cs ON cs.id = ol.curr_stk_id
+            LEFT JOIN stocks s ON s.id = cs.stock_id
+            LEFT JOIN boxes b ON b.id = cs.box_id
+            LEFT JOIN locations l ON l.id = b.location_id
+            LEFT JOIN warehouses w ON w.id = l.warehouse_id
+            LEFT JOIN customers c ON c.id = ol.customer_id
+            LEFT JOIN users u ON u.id = ol.created_by
+            WHERE ol.created_at BETWEEN %s AND %s
+        """
+
+        params = [min_dt.strftime("%Y-%m-%d %H:%M:%S"), max_dt.strftime("%Y-%m-%d %H:%M:%S")]
+
+        if action:
+            sql += " AND ol.action = %s"
+            params.append(action)
+
+        cursor.execute(sql, params)
+        rows = cursor.fetchall()
+        df = pd.DataFrame(rows)
+
+        df.columns = [
+            'id', 'OrderId', 'OrderItemId', 'OrderItemOrderNumber',
+            'ItemCode', 'ItemName', 'ItemDescription', 'ItemProductionDate',
+            'ItemWeight', 'ItemVolume', 'Barcode', 'OrderQty', 'PickingQty',
+            'PickPlace-W', 'PickPlace-L', 'PickPlace-B', 'PutawayQty', 'PutawayLocId',
+            'ShippingNumber', 'CurrCustomerId', 'CurrCustomerName', 'CurrCustomerPostCode',
+            'CurrCustomerPhone', 'CurrCustomerEmail', 'Action', 'Created_at', 'Created_by'
+        ]
+
+        os.makedirs(EXPORT_FOLDER, exist_ok=True)
+        df.to_excel(file_path, index=False)
+
+        cursor.execute("""
+            UPDATE export_jobs 
+            SET status=%s, percent=%s, file_name=%s, file_path=%s 
+            WHERE id = %s
+        """, ('done', 100, file_name, file_path, job_id))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        print(f"[✓] Export tamamlandı: {file_path}")
+    except Exception as e:
+        update_job_status(job_id, 'failed', 0)
+        print(f"[!] Export başarısız: {e}")
+
 # === MAIN ===
 if __name__ == "__main__":
     job = get_pending_order_jobs()
     if job:
-        export_order_items_to_excel(job)
+        table = job['table_name']
+        if table == 'orders':
+            export_order_items_to_excel(job)
+        elif table == 'orders_logs':
+            export_orders_logs_to_excel(job)
+        else:
+            print(f"[!] Desteklenmeyen tablo: {table}")
     else:
-        print("[✓] Bekleyen export_jobs kaydı yok.")
+        print("[✓] Bekleyen iş yok.")
