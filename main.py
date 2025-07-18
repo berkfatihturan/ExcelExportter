@@ -238,3 +238,5 @@ if __name__ == "__main__":
             print(f"[!] Desteklenmeyen tablo: {table}")
     else:
         print("[✓] Bekleyen iş yok.")
+
+
