@@ -15,12 +15,12 @@ DB_CONFIG = {
 EXPORT_FOLDER = "/home/smartemk221/Desktop/wms/exports"
 
 # === GET PENDING JOB ===
-def get_pending_order_jobs():
+def get_pending_export_job():
     conn = mysql.connector.connect(**DB_CONFIG)
     cursor = conn.cursor(dictionary=True)
     cursor.execute("""
         SELECT * FROM export_jobs
-        WHERE table_name = 'orders' AND status = 'pending'
+        WHERE table_name IN ('orders', 'orders_logs') AND status = 'pending'
         ORDER BY id ASC
         LIMIT 1
     """)
@@ -227,7 +227,7 @@ def export_orders_logs_to_excel(job):
 
 # === MAIN ===
 if __name__ == "__main__":
-    job = get_pending_order_jobs()
+    job = get_pending_export_job()
     if job:
         table = job['table_name']
         if table == 'orders':
