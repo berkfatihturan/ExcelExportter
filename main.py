@@ -254,7 +254,7 @@ def export_orders_logs_to_excel(job):
 
         filtered_seconds = [s for s in elapsed_seconds_list if s < 10]
         filtered_avg_seconds = sum(filtered_seconds) / len(filtered_seconds) if filtered_seconds else 0
-        filtered_total_duration = filtered_avg_seconds * len(filtered_seconds)
+        filtered_total_duration = sum(filtered_seconds)
 
         ft_h = int(filtered_total_duration // 3600)
         ft_m = int((filtered_total_duration % 3600) // 60)
