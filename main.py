@@ -292,6 +292,11 @@ def export_orders_logs_to_excel(job):
         conn.close()
 
         print(f"[✓] Export tamamlandı: {file_path}")
+
+        print("Toplam kayıt:", len(df))
+        print("Toplam ElapsedSeconds:", df['ElapsedSeconds'].sum())
+        print("Filtrelenmiş ElapsedSeconds toplamı (<10):", df[df['ElapsedSeconds'] < 10]['ElapsedSeconds'].sum())
+
     except Exception as e:
         update_job_status(job_id, 'failed', 0)
         print(f"[!] Export başarısız: {e}")
