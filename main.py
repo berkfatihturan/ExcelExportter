@@ -12,7 +12,8 @@ DB_CONFIG = {
     'database': 'SmartEmkWarehouseDB',
 }
 
-EXPORT_FOLDER = "/home/smartemk221/Desktop/wms/WarehouseManagementWebLocal/storage/app/public"
+EXPORT_FOLDER = "/home/smartemk221/Desktop/wms/WarehouseManagementWeb/storage/app/public"
+EXPORT_FOLDER_LOCAL = "/home/smartemk221/Desktop/wms/WarehouseManagementWebLocal/storage/app/public"
 
 # === GET PENDING JOB ===
 def get_pending_export_job():
@@ -60,7 +61,10 @@ def export_order_items_to_excel(job):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_name = f"orders_{order_id}_{timestamp}"
-    file_path = os.path.join(EXPORT_FOLDER, f"orderList/{job['file_name']}")
+    if search_values.get("local_host"):
+        file_path = os.path.join(EXPORT_FOLDER_LOCAL, f"orderList/{job['file_name']}")
+    else:
+        file_path = os.path.join(EXPORT_FOLDER, f"orderList/{job['file_name']}")
 
     try:
         update_job_status(job_id, 'processing', 0)
@@ -157,8 +161,11 @@ def export_orders_logs_to_excel(job):
         return
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_name = f"orders_logs_{timestamp}"
-    file_path = os.path.join(EXPORT_FOLDER, f"orderLog/{file_name}.xlsx")
+    file_name = f"{job['file_name']}"
+    if search_values.get("local_host"):
+        file_path = os.path.join(EXPORT_FOLDER_LOCAL, f"orderLog/{job['file_name']}")
+    else:
+        file_path = os.path.join(EXPORT_FOLDER, f"orderLog/{job['file_name']}")
 
     try:
         update_job_status(job_id, 'processing', 0)
