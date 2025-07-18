@@ -329,7 +329,7 @@ def export_orders_logs_to_excel_old(job):
         print(f"[!] Export başarısız: {e}")
 
 
-def export_order_items_to_excel(job):
+def export_orders_logs_to_excel(job):
     job_id = job["id"]
 
     # search_values'ı dict'e dönüştür
