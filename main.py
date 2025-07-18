@@ -1,3 +1,5 @@
+from time import sleep
+
 import mysql.connector
 import pandas as pd
 from datetime import datetime
@@ -328,16 +330,19 @@ def export_orders_logs_to_excel(job):
 
 # === MAIN ===
 if __name__ == "__main__":
-    job = get_pending_export_job()
-    if job:
-        table = job['table_name']
-        if table == 'orders':
-            export_order_items_to_excel(job)
-        elif table == 'orders_logs':
-            export_orders_logs_to_excel(job)
+    while 1:
+        job = get_pending_export_job()
+        if job:
+            table = job['table_name']
+            if table == 'orders':
+                export_order_items_to_excel(job)
+            elif table == 'orders_logs':
+                export_orders_logs_to_excel(job)
+            else:
+                print(f"[!] Desteklenmeyen tablo: {table}")
         else:
-            print(f"[!] Desteklenmeyen tablo: {table}")
-    else:
-        print("[✓] Bekleyen iş yok.")
+            print("[✓] Bekleyen iş yok.")
+
+        sleep(10);
 
 
