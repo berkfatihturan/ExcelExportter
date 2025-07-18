@@ -188,7 +188,6 @@ def export_orders_logs_to_excel(job):
         """
 
         params = [min_dt.strftime("%Y-%m-%d %H:%M:%S"), max_dt.strftime("%Y-%m-%d %H:%M:%S")]
-
         if action:
             sql += " AND ol.action = %s"
             params.append(action)
@@ -197,26 +196,21 @@ def export_orders_logs_to_excel(job):
         rows = cursor.fetchall()
         df = pd.DataFrame(rows)
 
-        # created_at string ise datetime'a çevir
         df['created_at'] = pd.to_datetime(df['created_at'])
-
-        # ElapsedSeconds hesapla
         df['ElapsedSeconds'] = df['created_at'].diff().dt.total_seconds().fillna(0).astype(int)
 
-        # ElapsedSeconds'ı created_at ile Created_by arasına yerleştir
         cols = df.columns.tolist()
         if 'created_at' in cols and 'Created_by' in cols:
             created_at_index = cols.index('created_at')
             cols.insert(created_at_index + 1, cols.pop(cols.index('ElapsedSeconds')))
             df = df[cols]
 
-        # Excel'e yaz
         os.makedirs(EXPORT_FOLDER, exist_ok=True)
         df.to_excel(file_path, index=False)
 
-        # Excel dosyasını aç ve koşullu renklendirme uygula
         from openpyxl import load_workbook
         from openpyxl.styles import PatternFill
+        from openpyxl.styles.borders import Border, Side
 
         wb = load_workbook(file_path)
         ws = wb.active
@@ -245,9 +239,46 @@ def export_orders_logs_to_excel(job):
                 except:
                     continue
 
+        # Ek bilgi (ortalama ve toplam süre)
+        created_at_list = df['created_at'].tolist()
+        elapsed_seconds_list = df['ElapsedSeconds'].tolist()
+
+        start_time = created_at_list[0]
+        end_time = created_at_list[-1]
+        total_seconds = int((end_time - start_time).total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        human_readable = f"{hours} saat {minutes} dakika {seconds} saniye"
+
+        avg_seconds = sum(elapsed_seconds_list) / len(elapsed_seconds_list)
+        avg_hours = avg_seconds / 3600
+
+        filtered_seconds = [s for s in elapsed_seconds_list if s < 10]
+        filtered_avg_seconds = sum(filtered_seconds) / len(filtered_seconds) if filtered_seconds else 0
+        filtered_avg_hours = filtered_avg_seconds / 3600
+
+        footer_row = ws.max_row + 2
+        ws[f"A{footer_row}"] = "Gercek"
+        ws[f"B{footer_row}"] = human_readable
+        ws[f"C{footer_row}"] = round(avg_hours, 6)
+
+        ws[f"A{footer_row + 1}"] = "Filtrelenmiş Ortalama Süre (Kırmızı değerler hariç)"
+        ws[f"B{footer_row + 1}"] = f"{int(filtered_avg_seconds // 3600)} saat {int((filtered_avg_seconds % 3600) // 60)} dakika"
+        ws[f"C{footer_row + 1}"] = round(filtered_avg_hours, 6)
+
+        thin_border = Border(
+            left=Side(style='thin'),
+            right=Side(style='thin'),
+            top=Side(style='thin'),
+            bottom=Side(style='thin')
+        )
+        for row in range(footer_row, footer_row + 2):
+            for col in range(1, 4):
+                ws.cell(row=row, column=col).border = thin_border
+
         wb.save(file_path)
 
-        # export_jobs tablosunu güncelle
         cursor.execute("""
             UPDATE export_jobs 
             SET status=%s, percent=%s, file_name=%s, file_path=%s 
