@@ -135,7 +135,7 @@ def export_order_items_to_excel(job):
         print(f"[!] Export işlemi başarısız: {e}")
 
 
-def export_orders_logs_to_excel(job):
+def export_orders_logs_to_excel_old(job):
     job_id = job["id"]
 
     try:
@@ -194,40 +194,23 @@ def export_orders_logs_to_excel(job):
         # SQL sorgusu (action varsa filtreli)
         sql = f"""
             SELECT 
-                o.id AS OrderItemId,
-                o.order_id AS OrderId,
-                o.order_sort_num AS OrderItemOrderNumber,
-                s.code AS ItemCode,
-                s.name AS ItemName,
-                s.feature AS ItemDescription,
-                s.production_date AS ItemProductionDate,
-                s.weight AS ItemWeight,
-                s.volume AS ItemVolume,
-                GROUP_CONCAT(b.barcode) AS Barcode,
-                o.orderQty AS OrderQty,
-                o.pickingQty AS PickingQty,
-                w.name AS PickPlace_W,
-                l.name AS PickPlace_L,
-                b2.name AS PickPlace_B,
-                o.putawayQty AS PutawayQty,
-                o.putaway_pin AS PutawayLocId,
-                o.shipping_number AS ShippingNumber,
-                c.id AS CurrCustomerId,
-                c.name AS CurrCustomerName,
-                c.post_code AS CurrCustomerPostCode,
-                c.phone AS CurrCustomerPhone,
-                c.email AS CurrCustomerEmail,
-                o.created_at AS created_at
-            FROM order_items o
-            LEFT JOIN current_stocks cs ON cs.id = o.curr_stk_id
+                ol.id, ol.order_id, ol.order_item_id, ol.order_sort_num,
+                s.code AS ItemCode, s.name AS ItemName, s.feature AS ItemDescription,
+                s.production_date AS ItemProductionDate, s.weight AS ItemWeight, s.volume AS ItemVolume,
+                ol.used_barcode_num AS Barcode, ol.orderQty, ol.pickingQty,
+                w.name AS PickPlace_W, l.name AS PickPlace_L, b.name AS PickPlace_B,
+                ol.putawayQty, ol.putaway_pin, ol.shipping_number,
+                c.id AS CurrCustomerId, c.name AS CurrCustomerName, c.post_code, c.phone, c.email,
+                ol.action, ol.created_at, u.name AS Created_by
+            FROM orders_logs ol
+            LEFT JOIN current_stocks cs ON cs.id = ol.curr_stk_id
             LEFT JOIN stocks s ON s.id = cs.stock_id
-            LEFT JOIN barcodes b ON b.curr_stk_id = cs.id
-            LEFT JOIN boxes b2 ON b2.id = cs.box_id
-            LEFT JOIN locations l ON l.id = b2.location_id
+            LEFT JOIN boxes b ON b.id = cs.box_id
+            LEFT JOIN locations l ON l.id = b.location_id
             LEFT JOIN warehouses w ON w.id = l.warehouse_id
-            LEFT JOIN customers c ON c.id = o.customer_id
-            WHERE o.order_id = %s
-            GROUP BY o.id
+            LEFT JOIN customers c ON c.id = ol.customer_id
+            LEFT JOIN users u ON u.id = ol.created_by
+            WHERE ol.created_at BETWEEN %s AND %s
         """
         params = [min_dt.strftime("%Y-%m-%d %H:%M:%S"), max_dt.strftime("%Y-%m-%d %H:%M:%S")]
         if action:
@@ -345,6 +328,108 @@ def export_orders_logs_to_excel(job):
         update_job_status(job_id, 'failed', 0)
         print(f"[!] Export başarısız: {e}")
 
+
+def export_order_items_to_excel(job):
+    job_id = job["id"]
+
+    # search_values'ı dict'e dönüştür
+    try:
+        search_values = ast.literal_eval(job["search_values"])
+    except Exception as e:
+        print(f"[!] search_values ayrıştırma hatası: {e}")
+        update_job_status(job_id, 'failed', 0)
+        return
+
+    order_id = search_values.get("order_id")
+    if not order_id:
+        update_job_status(job_id, 'failed', 0)
+        print("order_id bulunamadı.")
+        return
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"orders_{order_id}_{timestamp}"
+    if search_values.get("local_host"):
+        file_path = os.path.join(EXPORT_FOLDER_LOCAL, f"orderList/{file_name}.xlsx")
+    else:
+        file_path = os.path.join(EXPORT_FOLDER, f"orderList/{file_name}.xlsx")
+
+    try:
+        update_job_status(job_id, 'processing', 0)
+
+        conn = mysql.connector.connect(**DB_CONFIG)
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT 
+                o.id AS OrderItemId,
+                o.order_id AS OrderId,
+                o.order_sort_num AS OrderItemOrderNumber,
+                s.code AS ItemCode,
+                s.name AS ItemName,
+                s.feature AS ItemDescription,
+                s.production_date AS ItemProductionDate,
+                s.weight AS ItemWeight,
+                s.volume AS ItemVolume,
+                GROUP_CONCAT(b.barcode) AS Barcode,
+                o.orderQty AS OrderQty,
+                o.pickingQty AS PickingQty,
+                w.name AS PickPlace_W,
+                l.name AS PickPlace_L,
+                b2.name AS PickPlace_B,
+                o.putawayQty AS PutawayQty,
+                o.putaway_pin AS PutawayLocId,
+                o.shipping_number AS ShippingNumber,
+                c.id AS CurrCustomerId,
+                c.name AS CurrCustomerName,
+                c.post_code AS CurrCustomerPostCode,
+                c.phone AS CurrCustomerPhone,
+                c.email AS CurrCustomerEmail,
+                o.created_at AS created_at
+            FROM order_items o
+            LEFT JOIN current_stocks cs ON cs.id = o.curr_stk_id
+            LEFT JOIN stocks s ON s.id = cs.stock_id
+            LEFT JOIN barcodes b ON b.curr_stk_id = cs.id
+            LEFT JOIN boxes b2 ON b2.id = cs.box_id
+            LEFT JOIN locations l ON l.id = b2.location_id
+            LEFT JOIN warehouses w ON w.id = l.warehouse_id
+            LEFT JOIN customers c ON c.id = o.customer_id
+            WHERE o.order_id = %s
+            GROUP BY o.id
+        """, (order_id,))
+
+        rows = cursor.fetchall()
+        df = pd.DataFrame(rows)
+
+        # created_at varsa datetime'a dönüştür ve ElapsedSeconds hesapla
+        if 'created_at' in df.columns:
+            df['created_at'] = pd.to_datetime(df['created_at'], errors='coerce')
+            df['ElapsedSeconds'] = df['created_at'].diff().dt.total_seconds().fillna(0).astype(int)
+
+            # created_at'tan hemen sonra ElapsedSeconds ekle
+            cols = df.columns.tolist()
+            if 'ElapsedSeconds' in cols:
+                cols.remove('ElapsedSeconds')
+                created_index = cols.index('created_at') + 1
+                cols.insert(created_index, 'ElapsedSeconds')
+                df = df[cols]
+
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        df.to_excel(file_path, index=False)
+
+        cursor.execute("""
+            UPDATE export_jobs 
+            SET status=%s, percent=%s, file_name=%s, file_path=%s 
+            WHERE id = %s
+        """, ('done', 100, f"{file_name}.xlsx", file_path, job_id))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        print(f"[✓] Export tamamlandı: {file_path}")
+    except Exception as e:
+        update_job_status(job_id, 'failed', 0)
+        print(f"[!] Export işlemi başarısız: {e}")
 # === MAIN ===
 if __name__ == "__main__":
     while 1:
