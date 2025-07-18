@@ -200,19 +200,54 @@ def export_orders_logs_to_excel(job):
         # created_at string ise datetime'a çevir
         df['created_at'] = pd.to_datetime(df['created_at'])
 
-        # elapsed seconds sütunu ekle
+        # ElapsedSeconds hesapla
         df['ElapsedSeconds'] = df['created_at'].diff().dt.total_seconds().fillna(0).astype(int)
 
-        # ElapsedSeconds'ı created_at ile Created_by arasına al
+        # ElapsedSeconds'ı created_at ile Created_by arasına yerleştir
         cols = df.columns.tolist()
         if 'created_at' in cols and 'Created_by' in cols:
             created_at_index = cols.index('created_at')
             cols.insert(created_at_index + 1, cols.pop(cols.index('ElapsedSeconds')))
             df = df[cols]
 
+        # Excel'e yaz
         os.makedirs(EXPORT_FOLDER, exist_ok=True)
         df.to_excel(file_path, index=False)
 
+        # Excel dosyasını aç ve koşullu renklendirme uygula
+        from openpyxl import load_workbook
+        from openpyxl.styles import PatternFill
+
+        wb = load_workbook(file_path)
+        ws = wb.active
+
+        elapsed_col_idx = None
+        for col in range(1, ws.max_column + 1):
+            if ws.cell(row=1, column=col).value == "ElapsedSeconds":
+                elapsed_col_idx = col
+                break
+
+        if elapsed_col_idx:
+            red_fill = PatternFill(start_color="FFC7CE", end_color="FFC7CE", fill_type="solid")
+            orange_fill = PatternFill(start_color="FFEB9C", end_color="FFEB9C", fill_type="solid")
+            green_fill = PatternFill(start_color="C6EFCE", end_color="C6EFCE", fill_type="solid")
+
+            for row in range(2, ws.max_row + 1):
+                cell = ws.cell(row=row, column=elapsed_col_idx)
+                try:
+                    value = int(cell.value)
+                    if value >= 10:
+                        cell.fill = red_fill
+                    elif value >= 5:
+                        cell.fill = orange_fill
+                    else:
+                        cell.fill = green_fill
+                except:
+                    continue
+
+        wb.save(file_path)
+
+        # export_jobs tablosunu güncelle
         cursor.execute("""
             UPDATE export_jobs 
             SET status=%s, percent=%s, file_name=%s, file_path=%s 
