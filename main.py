@@ -12,7 +12,7 @@ DB_CONFIG = {
     'database': 'SmartEmkWarehouseDB',
 }
 
-EXPORT_FOLDER = "/home/smartemk221/Desktop/wms/exports"
+EXPORT_FOLDER = "/home/smartemk221/Desktop/wms/WarehouseManagementWebLocal/storage/app/public"
 
 # === GET PENDING JOB ===
 def get_pending_export_job():
@@ -60,7 +60,7 @@ def export_order_items_to_excel(job):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_name = f"orders_{order_id}_{timestamp}"
-    file_path = os.path.join(EXPORT_FOLDER, f"{file_name}.xlsx")
+    file_path = os.path.join(EXPORT_FOLDER, f"orderList/{file_name}.xlsx")
 
     try:
         update_job_status(job_id, 'processing', 0)
@@ -158,7 +158,7 @@ def export_orders_logs_to_excel(job):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_name = f"orders_logs_{timestamp}"
-    file_path = os.path.join(EXPORT_FOLDER, f"{file_name}.xlsx")
+    file_path = os.path.join(EXPORT_FOLDER, f"orderLog/{file_name}.xlsx")
 
     try:
         update_job_status(job_id, 'processing', 0)
@@ -293,9 +293,6 @@ def export_orders_logs_to_excel(job):
 
         print(f"[✓] Export tamamlandı: {file_path}")
 
-        print("Toplam kayıt:", len(df))
-        print("Toplam ElapsedSeconds:", df['ElapsedSeconds'].sum())
-        print("Filtrelenmiş ElapsedSeconds toplamı (<10):", df[df['ElapsedSeconds'] < 10]['ElapsedSeconds'].sum())
 
     except Exception as e:
         update_job_status(job_id, 'failed', 0)
