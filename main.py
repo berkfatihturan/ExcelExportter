@@ -60,7 +60,7 @@ def export_order_items_to_excel(job):
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     file_name = f"orders_{order_id}_{timestamp}"
-    file_path = os.path.join(EXPORT_FOLDER, f"orderList/{file_name}.xlsx")
+    file_path = os.path.join(EXPORT_FOLDER, f"orderList/{job['file_name']}.xlsx")
 
     try:
         update_job_status(job_id, 'processing', 0)
