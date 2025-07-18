@@ -252,20 +252,18 @@ def export_orders_logs_to_excel(job):
         human_readable = f"{hours} saat {minutes} dakika {seconds} saniye"
 
         avg_seconds = sum(elapsed_seconds_list) / len(elapsed_seconds_list)
-        avg_hours = avg_seconds / 3600
 
         filtered_seconds = [s for s in elapsed_seconds_list if s < 10]
         filtered_avg_seconds = sum(filtered_seconds) / len(filtered_seconds) if filtered_seconds else 0
-        filtered_avg_hours = filtered_avg_seconds / 3600
 
         footer_row = ws.max_row + 2
         ws[f"A{footer_row}"] = "Gercek"
         ws[f"B{footer_row}"] = human_readable
-        ws[f"C{footer_row}"] = round(avg_hours, 6)
+        ws[f"C{footer_row}"] = round(avg_seconds, 2)
 
         ws[f"A{footer_row + 1}"] = "Filtrelenmiş Ortalama Süre (Kırmızı değerler hariç)"
         ws[f"B{footer_row + 1}"] = f"{int(filtered_avg_seconds // 3600)} saat {int((filtered_avg_seconds % 3600) // 60)} dakika"
-        ws[f"C{footer_row + 1}"] = round(filtered_avg_hours, 6)
+        ws[f"C{footer_row + 1}"] = round(filtered_avg_seconds, 2)
 
         thin_border = Border(
             left=Side(style='thin'),
