@@ -149,7 +149,6 @@ def export_orders_logs_to_excel(job):
         return
 
     try:
-        # Laravel'deki gibi saatten 3 saat geri git
         min_dt = datetime.strptime(min_time, "%Y-%m-%dT%H:%M") - pd.Timedelta(hours=3)
         max_dt = datetime.strptime(max_time, "%Y-%m-%dT%H:%M") - pd.Timedelta(hours=3)
     except Exception as e:
@@ -198,14 +197,18 @@ def export_orders_logs_to_excel(job):
         rows = cursor.fetchall()
         df = pd.DataFrame(rows)
 
-        df.columns = [
-            'id', 'OrderId', 'OrderItemId', 'OrderItemOrderNumber',
-            'ItemCode', 'ItemName', 'ItemDescription', 'ItemProductionDate',
-            'ItemWeight', 'ItemVolume', 'Barcode', 'OrderQty', 'PickingQty',
-            'PickPlace-W', 'PickPlace-L', 'PickPlace-B', 'PutawayQty', 'PutawayLocId',
-            'ShippingNumber', 'CurrCustomerId', 'CurrCustomerName', 'CurrCustomerPostCode',
-            'CurrCustomerPhone', 'CurrCustomerEmail', 'Action', 'Created_at', 'Created_by'
-        ]
+        # created_at string ise datetime'a çevir
+        df['created_at'] = pd.to_datetime(df['created_at'])
+
+        # elapsed seconds sütunu ekle
+        df['ElapsedSeconds'] = df['created_at'].diff().dt.total_seconds().fillna(0).astype(int)
+
+        # ElapsedSeconds'ı created_at ile Created_by arasına al
+        cols = df.columns.tolist()
+        if 'created_at' in cols and 'Created_by' in cols:
+            created_at_index = cols.index('created_at')
+            cols.insert(created_at_index + 1, cols.pop(cols.index('ElapsedSeconds')))
+            df = df[cols]
 
         os.makedirs(EXPORT_FOLDER, exist_ok=True)
         df.to_excel(file_path, index=False)
