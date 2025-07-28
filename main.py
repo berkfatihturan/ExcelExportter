@@ -6,6 +6,7 @@ def run_versioned_code():
         module_path = f"{VERSION}.runner"  # Örn: v06.runner
         module = importlib.import_module(module_path)
         if hasattr(module, "run"):
+            print(f"Version : {VERSION}")
             module.run()
         else:
             raise AttributeError(f"'{module_path}' içinde 'run' fonksiyonu bulunamadı.")
