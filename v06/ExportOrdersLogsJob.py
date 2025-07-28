@@ -173,7 +173,10 @@ class ExportOrdersLogsJob:
         total_s = total_seconds % 60
         human_readable = f"{total_h} saat {total_m} dakika {total_s} saniye"
 
-        avg_seconds = sum(elapsed_seconds_list) / len(elapsed_seconds_list)
+        avg_filtered = [s for s in elapsed_seconds_list if s < 60]
+        #avg_seconds = sum(elapsed_seconds_list) / len(elapsed_seconds_list)
+        avg_seconds = sum(avg_filtered) / len(avg_filtered) if avg_filtered else 0
+
         filtered = [s for s in elapsed_seconds_list if s < 10]
         filtered_avg = sum(filtered) / len(filtered) if filtered else 0
         duration = filtered_avg * len(self.df)
