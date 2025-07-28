@@ -1,5 +1,4 @@
 from time import sleep
-
 import mysql.connector
 import pandas as pd
 from datetime import datetime
@@ -258,12 +257,18 @@ def export_orders_logs_to_excel(job):
                 cell = ws.cell(row=row, column=elapsed_col_idx)
                 try:
                     value = int(cell.value)
-                    if value >= 10:
-                        cell.fill = red_fill
-                    elif value >= 5:
-                        cell.fill = orange_fill
+                    if value > 60:
+                        # Tüm satırı kırmızıya boya
+                        for col in range(1, ws.max_column + 1):
+                            ws.cell(row=row, column=col).fill = red_fill
                     else:
-                        cell.fill = green_fill
+                        # Sadece ilgili hücreyi renklendir
+                        if value >= 10:
+                            cell.fill = red_fill
+                        elif value >= 5:
+                            cell.fill = orange_fill
+                        else:
+                            cell.fill = green_fill
                 except:
                     continue
 
