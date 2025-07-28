@@ -5,6 +5,8 @@ import pandas as pd
 from datetime import datetime
 import os
 import ast
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill, Border, Side
 
 DB_CONFIG = {
     'host': 'localhost',
@@ -237,8 +239,6 @@ def export_orders_logs_to_excel(job):
         df.to_excel(temp_path, index=False)
 
         # Excel biçimlendirme
-        from openpyxl import load_workbook
-        from openpyxl.styles import PatternFill, Border, Side
         wb = load_workbook(temp_path)
         ws = wb.active
 
